@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ENERGY LAB — Interactive Physics Game</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.9);
+            --panel-border: #334155;
+            --accent-green: #10b981;
+            --accent-blue: #3b82f6;
+            --accent-yellow: #f59e0b;
+            --accent-purple: #8b5cf6;
+            --accent-red: #ef4444;
+            --text-light: #f8fafc;
+            --text-dim: #94a3b8;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(--bg-dark); font-family: 'Inter', sans-serif; color: var(--text-light); }
+
+        #rotate-warning {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #0f172a; z-index: 999;
+            flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px;
+        }
+        @media screen and (orientation: portrait) {
+            #rotate-warning { display: flex; }
+        }
+
+        #game-container { width: 100vw; height: 100vh; display: flex; flex-direction: column; background: linear-gradient(135deg, #0b0f19 0%, #1e1b4b 50%, #0f172a 100%); position: relative; }
+
+        #hud {
+            height: 56px; background: rgba(15, 23, 42, 0.95); border-bottom: 2px solid #334155;
+            display: flex; justify-content: space-between; align-items: center; padding: 0 20px; z-index: 10;
+        }
+        .brand-title { font-family: 'Press Start 2P', monospace; font-size: 14px; color: #38bdf8; text-shadow: 0 0 8px rgba(56, 189, 248, 0.5); }
+        .player-status { display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 600; }
+        .badge { background: #334155; padding: 4px 10px; border-radius: 6px; color: #f1f5f9; }
+        
+        .btn-menu { background: #334155; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: 700; cursor: pointer; }
+        .btn-journal { background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: 700; cursor: pointer; }
+
+        #main-viewport { flex: 1; display: flex; position: relative; overflow: hidden; }
+        #canvas-stage { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); }
+        
+        #control-panel {
+            width: 340px; background: var(--panel-bg); border-left: 2px solid var(--panel-border);
+            padding: 18px; display: flex; flex-direction: column; gap: 15px; z-index: 5; overflow-y: auto;
+        }
+        .panel-title { font-size: 15px; font-weight: 700; color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 6px; text-transform: uppercase; }
+        .control-group { display: flex; flex-direction: column; gap: 6px; }
+        .control-group label { font-size: 13px; color: var(--text-dim); display: flex; justify-content: space-between; }
+        input[type=range] { width: 100%; accent-color: var(--accent-blue); cursor: pointer; }
+
+        .action-btn {
+            background: linear-gradient(135deg, #10b981, #059669); color: white; border: none;
+            padding: 10px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; text-align: center;
+        }
+
+        #dialogue-box {
+            position: absolute; bottom: 15px; left: 20px; right: 370px;
+            background: rgba(15, 23, 42, 0.95); border: 2px solid #38bdf8; border-radius: 12px;
+            padding: 14px 20px; display: flex; align-items: center; gap: 16px; z-index: 8;
+        }
+        .character-avatar { width: 60px; height: 60px; border-radius: 10px; background: #334155; display: flex; justify-content: center; align-items: center; font-size: 32px; border: 2px solid #38bdf8; flex-shrink: 0; }
+        .dialogue-content { flex: 1; }
+        .character-name { font-weight: 700; color: #38bdf8; font-size: 13px; margin-bottom: 3px; }
+        .dialogue-text { font-size: 14px; line-height: 1.4; color: #e2e8f0; }
+
+        .overlay-screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); z-index: 100;
+            display: flex; justify-content: center; align-items: center; padding: 20px;
+        }
+        .hidden { display: none !important; }
+
+        .card-box {
+            background: #1e293b; border: 2px solid #334155; border-radius: 16px;
+            padding: 30px; width: 480px; max-width: 90%; display: flex; flex-direction: column; gap: 18px;
+        }
+        .card-title { font-family: 'Press Start 2P', monospace; font-size: 16px; color: #38bdf8; text-align: center; }
+        .input-group { display: flex; flex-direction: column; gap: 6px; }
+        .input-group label { font-size: 13px; color: var(--text-dim); font-weight: 600; }
+        .input-group input { background: #0f172a; border: 1px solid #475569; padding: 10px 14px; border-radius: 8px; color: white; font-size: 14px; outline: none; }
+        .char-selection { display: flex; gap: 15px; }
+        .char-card { flex: 1; background: #0f172a; border: 2px solid #334155; border-radius: 10px; padding: 12px; text-align: center; cursor: pointer; }
+        .char-card.selected { border-color: #38bdf8; background: rgba(56, 189, 248, 0.1); }
+
+        /* DASHBOARD MENU UTAMA */
+        .dashboard-box {
+            background: #1e293b; border: 2px solid #38bdf8; border-radius: 16px;
+            padding: 30px; width: 700px; max-width: 95vw; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; gap: 20px;
+        }
+        .quest-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        .quest-card {
+            background: #0f172a; border: 2px solid #334155; border-radius: 12px; padding: 18px;
+            display: flex; flex-direction: column; gap: 10px; cursor: pointer; transition: all 0.2s;
+        }
+        .quest-card:hover { border-color: #38bdf8; transform: translateY(-3px); }
+        .quest-card h4 { color: #38bdf8; font-size: 14px; }
+        .quest-card p { font-size: 12px; color: var(--text-dim); line-height: 1.4; }
+
+        .journal-box, .quiz-box, .leaderboard-box { background: #1e293b; border-radius: 16px; padding: 24px; max-width: 90vw; display: flex; flex-direction: column; gap: 16px; }
+        .journal-box { border: 2px solid #8b5cf6; width: 650px; max-height: 85vh; }
+        .quiz-box { border: 2px solid #38bdf8; width: 680px; max-height: 88vh; }
+        .leaderboard-box { border: 2px solid #f59e0b; width: 600px; }
+
+        .formula-card { background: #0f172a; border-left: 4px solid #38bdf8; padding: 14px; border-radius: 0 8px 8px 0; }
+        .formula-eq { font-family: monospace; font-size: 16px; color: #f59e0b; margin: 6px 0; }
+        .quiz-opt-btn { background: #0f172a; border: 1px solid #334155; padding: 12px 16px; border-radius: 8px; color: white; text-align: left; cursor: pointer; font-size: 14px; }
+        .quiz-opt-btn.correct { background: rgba(16, 185, 129, 0.2); border-color: #10b981; }
+        .quiz-opt-btn.incorrect { background: rgba(239, 68, 68, 0.2); border-color: #ef4444; }
+        .lb-table { width: 100%; border-collapse: collapse; }
+        .lb-table th, .lb-table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #334155; font-size: 14px; }
+        .lb-table th { color: #f59e0b; }
+        .close-btn { background: #334155; border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+
+        /* Tampilan HP: halaman bisa digulir dan semua kontrol tetap terjangkau. */
+        @media screen and (max-width: 768px) {
+            html, body {
+                width: 100%;
+                height: auto;
+                min-height: 100%;
+                overflow-x: hidden;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                touch-action: pan-y;
+            }
+            #rotate-warning { display: none !important; }
+            #game-container {
+                width: 100%; height: auto; min-height: 100vh;
+                min-height: 100svh; overflow: visible;
+            }
+            #hud {
+                height: auto; min-height: 56px; padding: 10px 12px;
+                gap: 8px; flex-wrap: wrap;
+            }
+            .brand-title { font-size: 11px; }
+            .player-status { gap: 6px; font-size: 11px; flex-wrap: wrap; }
+            .badge { padding: 4px 7px; }
+            .btn-menu, .btn-journal { padding: 7px 9px; font-size: 11px; }
+            #main-viewport {
+                flex: none; min-height: 0; height: auto;
+                display: flex; flex-direction: column; overflow: visible;
+            }
+            #canvas-stage {
+                flex: none; width: 100%; height: 300px;
+                min-height: 240px; overflow: hidden;
+            }
+            #simCanvas { max-width: 100%; max-height: 100%; }
+            #control-panel {
+                width: 100%; max-height: none; overflow: visible;
+                border-left: 0; border-top: 2px solid var(--panel-border);
+                padding: 16px; gap: 14px;
+            }
+            #dialogue-box {
+                position: relative; left: auto; right: auto; bottom: auto;
+                margin: 0 12px 14px; padding: 12px; gap: 10px;
+            }
+            .character-avatar {
+                width: 46px; height: 46px; font-size: 25px;
+            }
+            .dialogue-text { font-size: 13px; }
+            .overlay-screen {
+                position: fixed; inset: 0; width: 100%; height: 100%;
+                height: 100dvh; overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                align-items: flex-start; justify-content: center;
+                padding: 14px 10px;
+            }
+            .card-box, .dashboard-box, .journal-box, .quiz-box, .leaderboard-box {
+                width: 100%; max-width: 560px; max-height: none;
+                padding: 18px; margin: auto 0; overflow: visible;
+            }
+            .dashboard-box { gap: 15px; }
+            .quest-grid { grid-template-columns: 1fr; gap: 10px; }
+            .quest-card { padding: 14px; }
+            .card-title { font-size: 14px; }
+            .journal-box, .quiz-box, .leaderboard-box { gap: 13px; }
+            .lb-table th, .lb-table td {
+                padding: 8px 5px; font-size: 11px; overflow-wrap: anywhere;
+            }
+        }
+        @media screen and (max-width: 380px) {
+            #canvas-stage { height: 250px; }
+            #hud { padding: 8px; }
+            .brand-title { font-size: 9px; }
+            .player-status { font-size: 10px; }
+            .card-box, .dashboard-box, .journal-box, .quiz-box, .leaderboard-box {
+                padding: 14px;
+            }
+        }
+
+
+        /* FUTURISTIC UPGRADE */
+        .progress-strip {
+            display:grid; grid-template-columns:repeat(4,1fr); gap:8px;
+            background:linear-gradient(135deg,rgba(14,165,233,.12),rgba(139,92,246,.16));
+            border:1px solid rgba(56,189,248,.35); border-radius:12px; padding:12px;
+        }
+        .progress-strip > div { display:flex; flex-direction:column; gap:5px; min-width:0; }
+        .progress-label { color:#94a3b8; font-size:9px; letter-spacing:1px; font-weight:700; }
+        .progress-strip strong { color:#e0f2fe; font-size:14px; overflow-wrap:anywhere; }
+        .progress-track { height:8px; background:#0f172a; border-radius:99px; overflow:hidden; border:1px solid #334155; }
+        .progress-fill { height:100%; width:0%; border-radius:99px; background:linear-gradient(90deg,#06b6d4,#8b5cf6); transition:width .35s ease; }
+        .dashboard-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+        .secondary-action { background:linear-gradient(135deg,#6366f1,#7c3aed); }
+        #quiz-timer-badge.urgent { background:#991b1b; color:#fee2e2; }
+        .achievement-item {
+            display:flex; align-items:center; gap:12px; padding:12px;
+            background:#0f172a; border:1px solid #334155; border-radius:10px; margin-bottom:9px;
+        }
+        .achievement-icon { font-size:25px; width:38px; text-align:center; }
+        .achievement-item strong { color:#e0f2fe; display:block; font-size:13px; }
+        .achievement-item p { color:#94a3b8; font-size:11px; margin-top:3px; line-height:1.4; }
+        .achievement-item.locked { opacity:.45; filter:grayscale(1); }
+        .hint-card {
+            background:rgba(14,165,233,.09); border:1px solid rgba(56,189,248,.3);
+            border-radius:9px; padding:11px; color:#cbd5e1; font-size:12px; line-height:1.5;
+        }
+        .hint-card strong { color:#38bdf8; }
+        .quest-card { border-color:rgba(56,189,248,.25); }
+        .quest-card:active { transform:scale(.98); }
+        @media screen and (max-width:768px) {
+            .progress-strip { grid-template-columns:repeat(2,1fr); }
+            .dashboard-actions { width:100%; }
+            .dashboard-actions button { flex:1; min-width:130px; }
+            .achievement-box { max-width:560px; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="rotate-warning">
+        <div style="font-size: 50px; margin-bottom: 15px;">📱🔄</div>
+        <h2 style="color: #38bdf8; margin-bottom: 10px;">Putar Layar HP Kamu!</h2>
+        <p style="color: #94a3b8; font-size: 14px; max-width: 300px;">Game Energy Lab dirancang dalam mode lanskap (mendatar agar simulasi fisika terlihat jelas).</p>
+    </div>
+
+    <div id="game-container">
+        <header id="hud">
+            <div class="brand-title">⚡ ENERGY LAB</div>
+            <div class="player-status">
+                <span id="hud-player-name" class="badge">👨‍🔬 Peneliti: -</span>
+                <span id="hud-level" class="badge">⭐ Level 1 · 0 XP</span>
+                <button class="btn-menu" onclick="openDashboard()">🗺️ Dashboard</button>
+            </div>
+            <button class="btn-journal" onclick="toggleJournal()">📖 Jurnal</button>
+        </header>
+
+        <div id="main-viewport">
+            <div id="canvas-stage">
+                <canvas id="simCanvas"></canvas>
+            </div>
+
+            <aside id="control-panel">
+                <div class="panel-title" id="panel-title">Kontrol Eksperimen</div>
+                <div id="dynamic-controls"></div>
+                <div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px;">
+                    <button id="btn-run-sim" class="action-btn" onclick="runSimulation()">▶️ JALANKAN SIMULASI</button>
+                    <button id="btn-next-quest" class="action-btn" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8);" onclick="openDashboard()">PILIH QUEST LAIN ➔</button>
+                </div>
+            </aside>
+
+            <div id="dialogue-box">
+                <div class="character-avatar" id="dialogue-avatar">👨‍🔬</div>
+                <div class="character-content">
+                    <div class="character-name" id="dialogue-name">Dr. Alex</div>
+                    <div class="dialogue-text" id="dialogue-text">Selamat datang di ENERGY LAB! Pilih quest dari Dashboard untuk memulai eksperimen.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- REGISTRATION OVERLAY -->
+    <div id="screen-registration" class="overlay-screen">
+        <div class="card-box">
+            <div class="card-title">ENERGY LAB</div>
+            <p style="text-align: center; color: var(--text-dim); font-size: 14px;">Masukkan identitas dirimu sebelum memulai eksperimen fisika!</p>
+            
+            <div class="input-group">
+                <label>Nama</label>
+                <input type="text" id="input-name" placeholder="Masukkan nama...">
+            </div>
+
+            <div class="input-group">
+                <label>Kelas</label>
+                <input type="text" id="input-class" placeholder="Masukkan kelas...">
+            </div>
+
+            <div class="input-group">
+                <label>Pilih Karakter Pemandu</label>
+                <div class="char-selection">
+                    <div class="char-card selected" id="char-alex" onclick="selectChar('alex')">
+                        <div style="font-size:40px; margin-bottom:6px;">👨‍🔬</div>
+                        <div style="font-weight:700; font-size:14px; color:#38bdf8;">Dr. Alex</div>
+                    </div>
+                    <div class="char-card" id="char-ally" onclick="selectChar('ally')">
+                        <div style="font-size:40px; margin-bottom:6px;">👩‍🔬</div>
+                        <div style="font-weight:700; font-size:14px; color:#ec4899;">Dr. Ally</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="action-btn" style="margin-top: 10px;" onclick="startGame()">START GAME 🚀</button>
+        </div>
+    </div>
+
+    <!-- DASHBOARD MENU UTAMA -->
+    <div id="screen-dashboard" class="overlay-screen hidden">
+        <div class="dashboard-box">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:12px;">
+                <h3 style="color:#38bdf8; font-family:'Press Start 2P', monospace; font-size:14px;">🗺️ DASHBOARD LAB UTAMA</h3>
+                <button class="close-btn" onclick="closeDashboard()">✕ Tutup</button>
+            </div>
+            <p style="font-size:13px; color:var(--text-dim);">Pilih eksperimen atau tantangan fisika yang ingin kamu pelajari:</p>
+            <div class="progress-strip">
+                <div><span class="progress-label">PROGRES PENELITI</span><strong id="dash-level">Level 1</strong></div>
+                <div><span class="progress-label">TOTAL XP</span><strong id="dash-xp">0 XP</strong></div>
+                <div><span class="progress-label">MISI SELESAI</span><strong id="dash-completed">0/5</strong></div>
+                <div><span class="progress-label">BADGE</span><strong id="dash-badges">0 🏅</strong></div>
+            </div>
+            <div class="progress-track"><div id="xp-progress" class="progress-fill"></div></div>
+            
+            <div class="quest-grid">
+                <div class="quest-card" onclick="startQuest(1)">
+                    <h4>🍎 Quest 1</h4>
+                    <p>Energi Potensial Gravitasi (Ep). Eksperimen apel dan ketinggian pohon.</p>
+                </div>
+                <div class="quest-card" onclick="startQuest(2)">
+                    <h4>🏎️ Quest 2</h4>
+                    <p>Energi Kinetik (Ek). Eksperimen kecepatan dan massa mobil.</p>
+                </div>
+                <div class="quest-card" onclick="startQuest(3)">
+                    <h4>🎢 Quest 3</h4>
+                    <p>Kekekalan Energi Mekanik (Em). Simulasi lintasan Roller Coaster.</p>
+                </div>
+                <div class="quest-card" onclick="startQuest(4)">
+                    <h4>🌀 Quest 4</h4>
+                    <p>Energi Potensial Pegas. Amati energi saat pegas ditekan atau diregangkan.</p>
+                </div>
+                <div class="quest-card" onclick="startQuest(5)">
+                    <h4>⚡ Quest 5</h4>
+                    <p>Usaha dan Energi. Ubah gaya dan perpindahan untuk menghitung usaha.</p>
+                </div>
+            </div>
+
+            <div style="border-top: 1px solid #334155; padding-top: 15px; display:flex; justify-content: space-between; align-items:center;">
+                <span style="font-size:13px; color:var(--text-dim);">Sudah siap menguji pemahamanmu?</span>
+                <button class="action-btn" style="background:linear-gradient(135deg, #f59e0b, #d97706);" onclick="startQuiz()">🎯 Mulai Kuis Tantangan (10 Soal)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JOURNAL OVERLAY -->
+    <div id="screen-journal" class="overlay-screen hidden">
+        <div class="journal-box">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; border-bottom:1px solid #334155; padding-bottom:10px;">
+                <div>
+                    <h3 style="color:#8b5cf6; font-size:16px; margin:0;">📖 Jurnal Fisika</h3>
+                    <p style="font-size:11px; color:var(--text-dim); margin:5px 0 0;">Ringkasan materi Quest 1–5</p>
+                </div>
+                <button class="close-btn" onclick="toggleJournal()">✕ Tutup</button>
+            </div>
+            <div style="overflow-y:auto; display:flex; flex-direction:column; gap:12px; padding:4px 6px 8px 0; max-height:65vh;">
+
+                <div class="formula-card">
+                    <div style="font-weight:700; color:#38bdf8;">1. Quest 1 — Energi Potensial Gravitasi (Ep)</div>
+                    <p style="font-size:12px; color:var(--text-dim); margin:7px 0;">Energi yang dimiliki benda karena posisi atau ketinggiannya dari titik acuan.</p>
+                    <div class="formula-eq">Ep = m × g × h</div>
+                    <p style="font-size:12px; color:var(--text-dim);">m = massa (kg) · g = percepatan gravitasi (m/s²) · h = ketinggian (m)</p>
+                    <p style="font-size:12px; margin:7px 0 0;"><b>Contoh:</b> Benda bermassa 2 kg berada pada ketinggian 3 m. Jika g = 10 m/s², maka Ep = 2 × 10 × 3 = <b>60 J</b>.</p>
+                </div>
+
+                <div class="formula-card" style="border-left-color:#10b981;">
+                    <div style="font-weight:700; color:#10b981;">2. Quest 2 — Energi Kinetik (Ek)</div>
+                    <p style="font-size:12px; color:var(--text-dim); margin:7px 0;">Energi yang dimiliki benda karena bergerak. Semakin besar massa atau kecepatan, semakin besar energi kinetiknya.</p>
+                    <div class="formula-eq" style="color:#10b981;">Ek = ½ × m × v²</div>
+                    <p style="font-size:12px; color:var(--text-dim);">m = massa (kg) · v = kecepatan (m/s)</p>
+                    <p style="font-size:12px; margin:7px 0 0;"><b>Contoh:</b> Benda bermassa 2 kg bergerak dengan kecepatan 4 m/s. Ek = ½ × 2 × 4² = <b>16 J</b>.</p>
+                </div>
+
+                <div class="formula-card" style="border-left-color:#f59e0b;">
+                    <div style="font-weight:700; color:#f59e0b;">3. Quest 3 — Energi Mekanik (Em)</div>
+                    <p style="font-size:12px; color:var(--text-dim); margin:7px 0;">Energi mekanik adalah jumlah energi potensial dan energi kinetik. Pada sistem tanpa gesekan, energi mekanik total tetap.</p>
+                    <div class="formula-eq">Em = Ep + Ek</div>
+                    <div class="formula-eq" style="font-size:15px;">Ep awal + Ek awal = Ep akhir + Ek akhir</div>
+                    <p style="font-size:12px; color:var(--text-dim);">Em = energi mekanik (J) · Ep = energi potensial (J) · Ek = energi kinetik (J)</p>
+                    <p style="font-size:12px; margin:7px 0 0;"><b>Contoh:</b> Jika Ep = 40 J dan Ek = 10 J, maka Em = 40 + 10 = <b>50 J</b>.</p>
+                </div>
+
+                <div class="formula-card" style="border-left-color:#c084fc;">
+                    <div style="font-weight:700; color:#c084fc;">4. Quest 4 — Energi Potensial Pegas (Es)</div>
+                    <p style="font-size:12px; color:var(--text-dim); margin:7px 0;">Energi yang tersimpan pada pegas ketika pegas diregangkan atau ditekan dari posisi keseimbangannya.</p>
+                    <div class="formula-eq" style="color:#c084fc;">Es = ½ × k × x²</div>
+                    <p style="font-size:12px; color:var(--text-dim);">k = konstanta pegas (N/m) · x = perubahan panjang/simpangan pegas (m)</p>
+                    <p style="font-size:12px; margin:7px 0 0;"><b>Contoh:</b> Pegas dengan k = 200 N/m ditekan sejauh 0,1 m. Es = ½ × 200 × 0,1² = <b>1 J</b>.</p>
+                </div>
+
+                <div class="formula-card" style="border-left-color:#fb7185;">
+                    <div style="font-weight:700; color:#fb7185;">5. Quest 5 — Usaha (W)</div>
+                    <p style="font-size:12px; color:var(--text-dim); margin:7px 0;">Usaha terjadi ketika gaya menyebabkan benda berpindah. Untuk gaya searah perpindahan, usaha dihitung dengan rumus berikut.</p>
+                    <div class="formula-eq" style="color:#fb7185;">W = F × s</div>
+                    <p style="font-size:12px; color:var(--text-dim);">W = usaha (J) · F = gaya (N) · s = perpindahan (m)</p>
+                    <p style="font-size:12px; margin:7px 0 0;"><b>Contoh:</b> Gaya 10 N mendorong benda sejauh 3 m searah gaya. W = 10 × 3 = <b>30 J</b>.</p>
+                </div>
+
+                <div class="formula-card" style="border-left-color:#64748b;">
+                    <div style="font-weight:700; color:#e2e8f0;">📌 Catatan Penting</div>
+                    <p style="font-size:12px; color:var(--text-dim); margin:7px 0 0;">Satuan energi dan usaha adalah joule (J). Pastikan massa dalam kg, jarak/ketinggian/simpangan dalam meter (m), kecepatan dalam m/s, gaya dalam newton (N), dan konstanta pegas dalam N/m sebelum menghitung.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACHIEVEMENT OVERLAY -->
+    <div id="screen-achievements" class="overlay-screen hidden">
+        <div class="journal-box achievement-box">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; border-bottom:1px solid #334155; padding-bottom:10px;">
+                <h3 style="color:#f59e0b; font-size:16px;">🏅 Pencapaian Peneliti</h3>
+                <button class="close-btn" onclick="closeAchievements()">✕ Tutup</button>
+            </div>
+            <div id="achievement-content"></div>
+            <button class="action-btn" onclick="closeAchievements()">Kembali ke Dashboard</button>
+        </div>
+    </div>
+
+    <!-- QUIZ OVERLAY -->
+    <div id="screen-quiz" class="overlay-screen hidden">
+        <div class="quiz-box">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:10px;">
+                <h3 style="color:#38bdf8;" id="quiz-progress-text">Final Challenge — Soal 1/10</h3>
+                <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;"><span class="badge" id="quiz-score-badge">Skor: 0</span><span class="badge hidden" id="quiz-timer-badge">⏱️ 60 dtk</span></div>
+            </div>
+            <div id="quiz-question-text" style="font-size:15px; font-weight:600; line-height:1.5;"></div>
+            <div class="quiz-options" id="quiz-options-container" style="display:flex; flex-direction:column; gap:10px;"></div>
+            <div id="quiz-explanation-box" class="hidden" style="background:#0f172a; border-left:4px solid #f59e0b; padding:12px; border-radius:6px; font-size:13px; line-height:1.4;">
+                <div style="font-weight:700; color:#f59e0b; margin-bottom:4px;">Pembahasan:</div>
+                <div id="quiz-explanation-text"></div>
+            </div>
+            <button id="btn-quiz-next" class="action-btn hidden" onclick="nextQuizQuestion()">Soal Berikutnya ➔</button>
+        </div>
+    </div>
+
+    <!-- LEADERBOARD OVERLAY -->
+    <div id="screen-leaderboard" class="overlay-screen hidden">
+        <div class="leaderboard-box">
+            <h2 style="color:#f59e0b; font-family:'Press Start 2P', monospace; font-size:16px; text-align:center;">🏆 LEADERBOARD</h2>
+            <table class="lb-table" style="margin-top:10px;">
+                <thead><tr><th>Peringkat</th><th>Nama</th><th>Kelas</th><th>Skor</th></tr></thead>
+                <tbody id="lb-table-body"></tbody>
+            </table>
+            <button class="action-btn" onclick="openDashboard()">Kembali ke Dashboard 🗺️</button>
+        </div>
+    </div>
+
+    <script>
+        let player = { name: 'Pemain', class: '-', char: 'alex' };
+        let currentQuest = 1;
+        let trialsDone = 0;
+        let score = 0;
+
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        function resizeCanvas() {
+            const stage = document.getElementById('canvas-stage');
+            canvas.width = stage.clientWidth - 40;
+            canvas.height = stage.clientHeight - 40;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(resizeCanvas, 150);
+        });
+
+        function selectChar(charType) {
+            player.char = charType;
+            document.getElementById('char-alex').classList.toggle('selected', charType === 'alex');
+            document.getElementById('char-ally').classList.toggle('selected', charType === 'ally');
+        }
+
+        function startGame() {
+            const nameInput = document.getElementById('input-name').value.trim();
+            const classInput = document.getElementById('input-class').value.trim();
+            player.name = nameInput || 'Pemain';
+            player.class = classInput || '-';
+
+            document.getElementById('hud-player-name').innerText = (player.char === 'alex' ? '👨‍🔬 ' : '👩‍🔬 ') + player.name + ' (' + player.class + ')';
+            document.getElementById('dialogue-avatar').innerText = player.char === 'alex' ? '👨‍🔬' : '👩‍🔬';
+            document.getElementById('dialogue-name').innerText = player.char === 'alex' ? 'Dr. Alex' : 'Dr. Ally';
+
+            document.getElementById('screen-registration').classList.add('hidden');
+            resizeCanvas();
+            updateProgressUI();
+            openDashboard();
+        }
+
+        function openDashboard() {
+            // Tutup layar lain terlebih dahulu agar tombol kembali dari leaderboard/kuis berfungsi.
+            ['screen-registration', 'screen-journal', 'screen-quiz', 'screen-leaderboard', 'screen-achievements']
+                .forEach(id => document.getElementById(id).classList.add('hidden'));
+
+            document.getElementById('screen-dashboard').classList.remove('hidden');
+        }
+
+        function closeDashboard() {
+            document.getElementById('screen-dashboard').classList.add('hidden');
+        }
+
+        const questConfigs = {
+    1: {
+                title: "Quest 1: Energi Potensial (Ep)",
+                dialogue: "Ubah massa & ketinggian apel di panel samping, lalu tekan 'JALANKAN SIMULASI'!",
+                controls: `
+                    <div class="control-group">
+                        <label>Massa Apel (kg): <span id="val-m">0.5</span></label>
+                        <input type="range" id="input-m" min="0.1" max="2" step="0.1" value="0.5" oninput="updateQuest1Values()">
+                    </div>
+                    <div class="control-group">
+                        <label>Ketinggian Pohon (m): <span id="val-h">5</span></label>
+                        <input type="range" id="input-h" min="1" max="10" step="0.5" value="5" oninput="updateQuest1Values()">
+                    </div>
+                    <div class="hint-card"><strong>Petunjuk:</strong> Energi potensial dipengaruhi massa, gravitasi, dan ketinggian benda.</div>
+                    <div class="formula-card" style="margin-top:10px;">
+                        <div style="font-size:12px; color:var(--text-dim);">Hasil Ep:</div>
+                        <div class="formula-eq" id="calc-ep">Ep = 24.5 Joule</div>
+                    </div>
+                `
+            },
+            2: {
+                title: "Quest 2: Energi Kinetik (Ek)",
+                dialogue: "Atur massa mobil & kecepatan, lalu tekan 'JALANKAN SIMULASI'!",
+                controls: `
+                    <div class="control-group">
+                        <label>Massa Mobil (kg): <span id="val-m2">1000</span></label>
+                        <input type="range" id="input-m2" min="500" max="2000" step="100" value="1000" oninput="updateQuest2Values()">
+                    </div>
+                    <div class="control-group">
+                        <label>Kecepatan (m/s): <span id="val-v">10</span></label>
+                        <input type="range" id="input-v" min="2" max="30" step="1" value="10" oninput="updateQuest2Values()">
+                    </div>
+                    <div class="hint-card"><strong>Petunjuk:</strong> Energi kinetik dipengaruhi massa dan kuadrat kecepatan.</div>
+                    <div class="formula-card" style="margin-top:10px; border-left-color:#10b981;">
+                        <div style="font-size:12px; color:var(--text-dim);">Hasil Ek:</div>
+                        <div class="formula-eq" style="color:#10b981;" id="calc-ek">Ek = 50,000 Joule</div>
+                    </div>
+                `
+            },
+            3: {
+                title: "Quest 3: Kekekalan Energi Mekanik (Em)",
+                dialogue: "Amati perubahan energi pada Roller Coaster saat meluncur!",
+                controls: `
+                    <div class="control-group">
+                        <label>Massa Kereta (kg): <span id="val-m3">500</span></label>
+                        <input type="range" id="input-m3" min="200" max="1000" step="50" value="500" oninput="updateQuest3Values()">
+                    </div>
+                    <div class="formula-card" style="margin-top:10px; border-left-color:#f59e0b;">
+                        <div style="font-size:12px; color:var(--text-dim);">Live Energy:</div>
+                        <div style="font-size:13px; color:#38bdf8;" id="live-ep">Ep: -</div>
+                        <div style="font-size:13px; color:#10b981;" id="live-ek">Ek: -</div>
+                        <div style="font-size:13px; color:#f59e0b; font-weight:700;" id="live-em">Em: -</div>
+                    </div>
+                `
+            },
+            4: {
+                title: "Quest 4: Energi Potensial Pegas",
+                dialogue: "Atur konstanta pegas dan perubahan panjang, lalu jalankan simulasi!",
+                controls: `
+                    <div class="hint-card"><strong>Petunjuk:</strong> Energi potensial pegas bertambah saat pegas ditekan atau diregangkan lebih jauh.</div>
+                    <div class="control-group">
+                        <label>Konstanta Pegas (N/m): <span id="val-k">100</span></label>
+                        <input type="range" id="input-k" min="20" max="300" step="10" value="100" oninput="updateQuest4Values()">
+                    </div>
+                    <div class="control-group">
+                        <label>Perubahan Panjang (m): <span id="val-x">0.2</span></label>
+                        <input type="range" id="input-x" min="0.05" max="0.5" step="0.05" value="0.2" oninput="updateQuest4Values()">
+                    </div>
+                    <div class="formula-card" style="border-left-color:#a78bfa;">
+                        <div style="font-size:12px;color:var(--text-dim)">Energi Potensial Pegas:</div>
+                        <div class="formula-eq" style="color:#a78bfa" id="calc-es">Es = 2.0 Joule</div>
+                        <div style="font-size:11px;color:var(--text-dim)">Es = ½ × k × x²</div>
+                    </div>`
+            },
+            5: {
+                title: "Quest 5: Usaha dan Energi",
+                dialogue: "Atur besar gaya dan perpindahan benda untuk menghitung usaha!",
+                controls: `
+                    <div class="hint-card"><strong>Petunjuk:</strong> Usaha terjadi ketika gaya menyebabkan benda berpindah searah gaya.</div>
+                    <div class="control-group">
+                        <label>Gaya (N): <span id="val-f">20</span></label>
+                        <input type="range" id="input-f" min="5" max="100" step="5" value="20" oninput="updateQuest5Values()">
+                    </div>
+                    <div class="control-group">
+                        <label>Perpindahan (m): <span id="val-s">3</span></label>
+                        <input type="range" id="input-s" min="1" max="10" step="1" value="3" oninput="updateQuest5Values()">
+                    </div>
+                    <div class="formula-card" style="border-left-color:#f59e0b;">
+                        <div style="font-size:12px;color:var(--text-dim)">Usaha:</div>
+                        <div class="formula-eq" id="calc-work">W = 60 Joule</div>
+                        <div style="font-size:11px;color:var(--text-dim)">W = F × s</div>
+                    </div>`
+            }
+        };
+
+        function startQuest(qNum) {
+            currentQuest = qNum;
+            trialsDone = 0;
+            closeDashboard();
+            document.getElementById('panel-title').innerText = questConfigs[qNum].title;
+            document.getElementById('dynamic-controls').innerHTML = questConfigs[qNum].controls;
+            document.getElementById('dialogue-text').innerText = questConfigs[qNum].dialogue;
+            drawStaticScene();
+            updateProgressUI();
+        }
+
+        let appleY = 0;
+        let isAnim = false;
+
+        function updateQuest1Values() {
+            const m = parseFloat(document.getElementById('input-m').value);
+            const h = parseFloat(document.getElementById('input-h').value);
+            document.getElementById('val-m').innerText = m;
+            document.getElementById('val-h').innerText = h;
+            document.getElementById('calc-ep').innerText = `Ep = ${(m * 9.8 * h).toFixed(1)} Joule`;
+            drawStaticScene();
+        }
+
+        function updateQuest2Values() {
+            const m = parseFloat(document.getElementById('input-m2').value);
+            const v = parseFloat(document.getElementById('input-v').value);
+            document.getElementById('val-m2').innerText = m;
+            document.getElementById('val-v').innerText = v;
+            document.getElementById('calc-ek').innerText = `Ek = ${(0.5 * m * v * v).toLocaleString()} Joule`;
+            drawStaticScene();
+        }
+
+        function updateQuest3Values() { drawStaticScene(); }
+
+        function updateQuest4Values() {
+            const k = Number(document.getElementById('input-k').value);
+            const x = Number(document.getElementById('input-x').value);
+            document.getElementById('val-k').innerText = k;
+            document.getElementById('val-x').innerText = x.toFixed(2);
+            document.getElementById('calc-es').innerText = `Es = ${(0.5*k*x*x).toFixed(2)} Joule`;
+            drawStaticScene();
+        }
+
+        function updateQuest5Values() {
+            const f = Number(document.getElementById('input-f').value);
+            const s = Number(document.getElementById('input-s').value);
+            document.getElementById('val-f').innerText = f;
+            document.getElementById('val-s').innerText = s;
+            document.getElementById('calc-work').innerText = `W = ${(f*s).toLocaleString()} Joule`;
+            drawStaticScene();
+        }
+
+        function runSimulation() {
+            if (isAnim) return;
+            trialsDone++;
+            if (currentQuest === 1) animateAppleDrop();
+            else if (currentQuest === 2) animateCarDrive();
+            else if (currentQuest === 3) animateCoaster();
+            else if (currentQuest === 4) animateSpring();
+            else if (currentQuest === 5) animateWork();
+        }
+
+        function drawStaticScene() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (currentQuest === 1) {
+                const h = parseFloat(document.getElementById('input-h')?.value || 5);
+                const groundY = canvas.height - 40;
+                const scale = Math.max(0.65, Math.min(1.15, canvas.height / 420));
+                const trunkW = 48 * scale;
+                const trunkH = 225 * scale;
+                const crownR = 132 * scale;
+                const treeX = canvas.width / 2;
+                const crownY = groundY - trunkH - crownR * 0.72;
+
+                // Tanah dan pohon yang lebih tinggi serta lebih besar.
+                ctx.fillStyle = '#334155';
+                ctx.fillRect(0, groundY, canvas.width, 40);
+
+                ctx.fillStyle = '#854d0e';
+                ctx.fillRect(treeX - trunkW / 2, groundY - trunkH, trunkW, trunkH);
+
+                ctx.fillStyle = '#166534';
+                ctx.beginPath();
+                ctx.arc(treeX, crownY, crownR, 0, Math.PI * 2);
+                ctx.arc(treeX - crownR * 0.62, crownY + crownR * 0.28, crownR * 0.72, 0, Math.PI * 2);
+                ctx.arc(treeX + crownR * 0.62, crownY + crownR * 0.28, crownR * 0.72, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Posisi apel mengikuti nilai ketinggian pada panel.
+                appleY = groundY - (h / 10) * (trunkH + crownR * 0.85);
+                ctx.font = `${Math.round(34 * scale)}px serif`;
+                ctx.fillText('🍎', treeX - 18 * scale, appleY);
+            } else if (currentQuest === 2) {
+                ctx.fillStyle = '#334155'; ctx.fillRect(0, canvas.height/2 + 20, canvas.width, 60);
+                ctx.save();
+                ctx.translate(50 + 40, 0);
+                ctx.scale(-1, 1);
+                ctx.font = '40px serif';
+                ctx.fillText('🏎️', 0, canvas.height/2 + 40);
+                ctx.restore();
+            } else if (currentQuest === 3) {
+                ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.moveTo(40, 80);
+                ctx.bezierCurveTo(canvas.width*0.3, canvas.height - 50, canvas.width*0.6, 50, canvas.width - 40, canvas.height - 60);
+                ctx.stroke();
+                ctx.font = '30px serif'; ctx.fillText('🎢', 40, 75);
+            } else if (currentQuest === 4) {
+                const x = Number(document.getElementById('input-x')?.value || 0.2);
+                const coils = 10;
+                const startX = 45, endX = Math.min(canvas.width - 45, 45 + x * 430);
+                ctx.strokeStyle = '#a78bfa'; ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.moveTo(25, canvas.height/2);
+                ctx.lineTo(startX, canvas.height/2);
+                for (let i=0;i<=coils;i++) {
+                    const px = startX + (endX-startX)*i/coils;
+                    ctx.lineTo(px, canvas.height/2 + (i%2===0 ? -24 : 24));
+                }
+                ctx.lineTo(endX+25, canvas.height/2); ctx.stroke();
+                ctx.fillStyle = '#64748b'; ctx.fillRect(endX+25, canvas.height/2-38, 48, 76);
+                ctx.fillStyle = '#c4b5fd'; ctx.font = '14px Inter'; ctx.fillText('PEGAS', 20, 35);
+            } else if (currentQuest === 5) {
+                const f = Number(document.getElementById('input-f')?.value || 20);
+                const s = Number(document.getElementById('input-s')?.value || 3);
+                const y = canvas.height/2;
+                ctx.fillStyle = '#334155'; ctx.fillRect(20, y+35, canvas.width-40, 8);
+                ctx.fillStyle = '#38bdf8'; ctx.fillRect(55, y-22, 62, 55);
+                ctx.fillStyle = '#e0f2fe'; ctx.font = '24px serif'; ctx.fillText('📦', 70, y+18);
+                ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.moveTo(125, y-8); ctx.lineTo(Math.min(canvas.width-35,125+s*25), y-8);
+                ctx.lineTo(Math.min(canvas.width-45,115+s*25), y-18); ctx.moveTo(Math.min(canvas.width-35,125+s*25), y-8);
+                ctx.lineTo(Math.min(canvas.width-45,115+s*25), y+2); ctx.stroke();
+                ctx.fillStyle = '#fbbf24'; ctx.font = '13px Inter'; ctx.fillText(`Gaya ${f} N`, 25, 35);
+            }
+        }
+
+        function animateAppleDrop() {
+            isAnim = true; let curY = appleY;
+            const endY = canvas.height - 55;
+            function step() {
+                curY += 6;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                const groundY = canvas.height - 40;
+                const scale = Math.max(0.65, Math.min(1.15, canvas.height / 420));
+                const trunkW = 48 * scale;
+                const trunkH = 225 * scale;
+                const crownR = 132 * scale;
+                const treeX = canvas.width / 2;
+                const crownY = groundY - trunkH - crownR * 0.72;
+
+                ctx.fillStyle = '#334155';
+                ctx.fillRect(0, groundY, canvas.width, 40);
+                ctx.fillStyle = '#854d0e';
+                ctx.fillRect(treeX - trunkW / 2, groundY - trunkH, trunkW, trunkH);
+                ctx.fillStyle = '#166534';
+                ctx.beginPath();
+                ctx.arc(treeX, crownY, crownR, 0, Math.PI * 2);
+                ctx.arc(treeX - crownR * 0.62, crownY + crownR * 0.28, crownR * 0.72, 0, Math.PI * 2);
+                ctx.arc(treeX + crownR * 0.62, crownY + crownR * 0.28, crownR * 0.72, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.font = `${Math.round(34 * scale)}px serif`;
+                ctx.fillText('🍎', treeX - 18 * scale, curY);
+                if (curY < endY) requestAnimationFrame(step); else { isAnim = false; awardQuestCompletion(1); }
+            }
+            step();
+        }
+
+        function animateCarDrive() {
+            isAnim = true; let posX = 50;
+            const speed = parseFloat(document.getElementById('input-v').value) * 0.4;
+            function step() {
+                posX += speed;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#334155'; ctx.fillRect(0, canvas.height/2 + 20, canvas.width, 60);
+                ctx.save();
+                ctx.translate(posX + 40, 0);
+                ctx.scale(-1, 1);
+                ctx.font = '40px serif';
+                ctx.fillText('🏎️', 0, canvas.height/2 + 40);
+                ctx.restore();
+                if (posX < canvas.width - 80) requestAnimationFrame(step); else { isAnim = false; drawStaticScene(); awardQuestCompletion(2); }
+            }
+            step();
+        }
+
+        function animateCoaster() {
+            isAnim = true; let t = 0;
+            const m = parseFloat(document.getElementById('input-m3').value);
+            function step() {
+                t += 0.008; if (t > 1) t = 1;
+                const p0 = {x: 40, y: 80}, p1 = {x: canvas.width*0.3, y: canvas.height - 50}, p2 = {x: canvas.width*0.6, y: 50}, p3 = {x: canvas.width - 40, y: canvas.height - 60};
+                const x = Math.pow(1-t,3)*p0.x + 3*Math.pow(1-t,2)*t*p1.x + 3*(1-t)*Math.pow(t,2)*p2.x + Math.pow(t,3)*p3.x;
+                const y = Math.pow(1-t,3)*p0.y + 3*Math.pow(1-t,2)*t*p1.y + 3*(1-t)*Math.pow(t,2)*p2.y + Math.pow(t,3)*p3.y;
+                
+                const ep = Math.max(0, m * 9.8 * ((canvas.height - y) / 20));
+                const totalEm = m * 9.8 * ((canvas.height - 80)/20);
+                const ek = Math.max(0, totalEm - ep);
+
+                document.getElementById('live-ep').innerText = `Ep: ${Math.round(ep).toLocaleString()} J`;
+                document.getElementById('live-ek').innerText = `Ek: ${Math.round(ek).toLocaleString()} J`;
+                document.getElementById('live-em').innerText = `Em: ${Math.round(totalEm).toLocaleString()} J`;
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.bezierCurveTo(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y); ctx.stroke();
+                ctx.font = '30px serif'; ctx.fillText('🎢', x - 15, y - 5);
+
+                if (t < 1) requestAnimationFrame(step); else { isAnim = false; awardQuestCompletion(3); }
+            }
+            step();
+        }
+
+
+        function animateSpring() {
+            isAnim = true;
+            const k = Number(document.getElementById('input-k').value);
+            const stretch = Number(document.getElementById('input-x').value);
+            let frame = 0;
+            function step() {
+                frame++;
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                const mid = canvas.height/2, start = 45, end = Math.min(canvas.width-70, start + stretch*430);
+                ctx.strokeStyle = '#a78bfa'; ctx.lineWidth = 4; ctx.beginPath();
+                ctx.moveTo(25,mid); ctx.lineTo(start,mid);
+                for(let i=0;i<=12;i++){
+                    const px=start+(end-start)*i/12;
+                    ctx.lineTo(px,mid+(i%2===0?-24:24));
+                }
+                ctx.lineTo(end+20,mid); ctx.stroke();
+                ctx.fillStyle='#64748b'; ctx.fillRect(end+20,mid-38,48,76);
+                ctx.fillStyle='#c4b5fd'; ctx.font='14px Inter'; ctx.fillText(`k = ${k} N/m`,20,35);
+                if(frame<36) requestAnimationFrame(step);
+                else { isAnim=false; awardQuestCompletion(4); drawStaticScene(); }
+            }
+            step();
+        }
+
+        function animateWork() {
+            isAnim = true;
+            const force = Number(document.getElementById('input-f').value);
+            const distance = Number(document.getElementById('input-s').value);
+            let pos = 0;
+            function step() {
+                pos += 4;
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                const y=canvas.height/2;
+                ctx.fillStyle='#334155'; ctx.fillRect(20,y+35,canvas.width-40,8);
+                const x=Math.min(55+pos,canvas.width-110);
+                ctx.fillStyle='#38bdf8'; ctx.fillRect(x,y-22,62,55);
+                ctx.font='24px serif'; ctx.fillText('📦',x+13,y+18);
+                ctx.strokeStyle='#f59e0b'; ctx.lineWidth=4;
+                ctx.beginPath(); ctx.moveTo(x+65,y-8); ctx.lineTo(x+105,y-8); ctx.stroke();
+                ctx.fillStyle='#fbbf24'; ctx.font='13px Inter'; ctx.fillText(`F = ${force} N · s = ${distance} m`,20,35);
+                if(pos<Math.min(distance*12,canvas.width-190)) requestAnimationFrame(step);
+                else { isAnim=false; awardQuestCompletion(5); drawStaticScene(); }
+            }
+            step();
+        }
+
+        const defaultProgress = { xp: 0, completed: [], badges: [], history: [] };
+        let gameProgress = loadProgress();
+
+        function loadProgress() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('energylab_progress') || 'null');
+                if (saved && typeof saved.xp === 'number') return {
+                    xp: saved.xp, completed: Array.isArray(saved.completed) ? saved.completed : [],
+                    badges: Array.isArray(saved.badges) ? saved.badges : []
+                };
+            } catch (e) {}
+            return { ...defaultProgress, completed: [], badges: [], history: [] };
+        }
+
+        function saveProgress() {
+            try { localStorage.setItem('energylab_progress', JSON.stringify(gameProgress)); } catch(e) {}
+        }
+
+        function getLevel() { return Math.floor(gameProgress.xp / 200) + 1; }
+
+        function awardQuestCompletion(qNum) {
+            if (gameProgress.completed.includes(qNum)) {
+                document.getElementById('dialogue-text').innerText = 'Eksperimen selesai! Quest ini sudah pernah diselesaikan. Coba quest lainnya untuk mendapatkan XP baru.';
+                return;
+            }
+            gameProgress.completed.push(qNum);
+            gameProgress.history = gameProgress.history || [];
+            gameProgress.history.unshift({ quest: qNum, date: new Date().toLocaleString('id-ID') });
+            gameProgress.history = gameProgress.history.slice(0, 8);
+            gameProgress.xp += 100;
+            if (gameProgress.completed.length >= 1 && !gameProgress.badges.includes('Pemula')) gameProgress.badges.push('Pemula');
+            if (gameProgress.completed.length >= 3 && !gameProgress.badges.includes('Eksplorator')) gameProgress.badges.push('Eksplorator');
+            if (gameProgress.completed.length >= 5 && !gameProgress.badges.includes('Master Energi')) gameProgress.badges.push('Master Energi');
+            saveProgress();
+            updateProgressUI();
+            document.getElementById('dialogue-text').innerText = `Quest ${qNum} selesai! +100 XP. Total XP: ${gameProgress.xp}.`;
+        }
+
+        function updateProgressUI() {
+            const level = getLevel(), xpInLevel = gameProgress.xp % 200;
+            const setText = (id, value) => { const el=document.getElementById(id); if(el) el.textContent=value; };
+            setText('hud-level', `⭐ Level ${level} · ${gameProgress.xp} XP`);
+            setText('dash-level', `Level ${level}`);
+            setText('dash-xp', `${gameProgress.xp} XP`);
+            setText('dash-completed', `${gameProgress.completed.length}/5`);
+            setText('dash-badges', `${gameProgress.badges.length} 🏅`);
+            const bar=document.getElementById('xp-progress');
+            if(bar) bar.style.width = `${xpInLevel/2}%`;
+        }
+
+        function showAchievements() {
+            updateProgressUI();
+            const area=document.getElementById('achievement-content');
+            const all=[
+                ['Pemula','🔬','Selesaikan satu quest pertama.'],
+                ['Eksplorator','🧭','Selesaikan minimal tiga quest.'],
+                ['Master Energi','🏆','Selesaikan kelima quest.']
+            ];
+            const badgeHtml = all.map(([name,icon,desc]) => {
+                const unlocked=gameProgress.badges.includes(name);
+                return `<div class="achievement-item ${unlocked?'':'locked'}"><div class="achievement-icon">${icon}</div><div><strong>${unlocked?'✓ ':''}${name}</strong><p>${desc}</p></div></div>`;
+            }).join('');
+            const historyHtml = (gameProgress.history || []).length
+                ? gameProgress.history.map(item => `<div class="achievement-item"><div class="achievement-icon">📘</div><div><strong>Quest ${item.quest} selesai</strong><p>${item.date}</p></div></div>`).join('')
+                : '<p style="color:#94a3b8;font-size:12px;">Belum ada riwayat eksperimen.</p>';
+            area.innerHTML = badgeHtml + `<h4 style="color:#38bdf8;margin:14px 0 8px;">Riwayat Eksperimen</h4>${historyHtml}<div class="hint-card">Progres tersimpan di browser perangkat ini. Total XP: <strong>${gameProgress.xp}</strong> · Quest selesai: <strong>${gameProgress.completed.length}/5</strong>.</div>`;
+            document.getElementById('screen-dashboard').classList.add('hidden');
+            document.getElementById('screen-achievements').classList.remove('hidden');
+        }
+
+        function closeAchievements() {
+            document.getElementById('screen-achievements').classList.add('hidden');
+            document.getElementById('screen-dashboard').classList.remove('hidden');
+        }
+
+        function toggleJournal() { document.getElementById('screen-journal').classList.toggle('hidden'); }
+
+        const quizData = [
+            { q: "Energi potensial gravitasi (Ep) dipengaruhi oleh...", opts: ["A. Massa, gravitasi, dan ketinggian", "B. Massa dan kecepatan", "C. Gaya dan waktu", "D. Suhu dan tekanan"], ans: 0, exp: "Ep = m × g × h, sehingga dipengaruhi massa, gravitasi, dan ketinggian." },
+            { q: "Sebuah benda berada di tempat yang semakin tinggi. Jika massa dan gravitasi tetap, energi potensialnya akan...", opts: ["A. Berkurang", "B. Bertambah", "C. Tetap sama", "D. Menjadi nol"], ans: 1, exp: "Semakin tinggi posisi benda, semakin besar energi potensial gravitasinya." },
+            { q: "Rumus energi kinetik (Ek) yang benar adalah...", opts: ["A. m × g × h", "B. F × s", "C. ½ × m × v²", "D. ½ × k × x²"], ans: 2, exp: "Energi kinetik adalah energi karena gerak, dengan rumus Ek = ½ × m × v²." },
+            { q: "Jika kecepatan benda menjadi 2 kali semula dan massanya tetap, energi kinetiknya menjadi...", opts: ["A. 2 kali", "B. 3 kali", "C. 4 kali", "D. 8 kali"], ans: 2, exp: "Ek sebanding dengan kuadrat kecepatan. Jika v menjadi 2v, Ek menjadi 2² = 4 kali." },
+            { q: "Energi mekanik merupakan jumlah dari...", opts: ["A. Energi potensial dan energi kinetik", "B. Gaya dan perpindahan", "C. Massa dan percepatan", "D. Energi panas dan suhu"], ans: 0, exp: "Energi mekanik (Em) = energi potensial (Ep) + energi kinetik (Ek)." },
+            { q: "Pada sistem tanpa gesekan, jumlah energi mekanik selama benda bergerak...", opts: ["A. Selalu bertambah", "B. Selalu berkurang", "C. Tetap", "D. Selalu menjadi nol"], ans: 2, exp: "Tanpa gaya nonkonservatif seperti gesekan, energi mekanik total tetap atau kekal." },
+            { q: "Energi potensial pegas dipengaruhi oleh...", opts: ["A. Massa dan ketinggian", "B. Konstanta pegas dan pertambahan panjang", "C. Gaya gravitasi dan waktu", "D. Kecepatan dan massa"], ans: 1, exp: "Es = ½ × k × x². Nilainya dipengaruhi konstanta pegas (k) dan simpangan (x)." },
+            { q: "Jika konstanta pegas tetap dan simpangan pegas menjadi 2 kali, energi potensial pegas menjadi...", opts: ["A. 2 kali", "B. 3 kali", "C. 4 kali", "D. ½ kali"], ans: 2, exp: "Energi pegas sebanding dengan kuadrat simpangan. Jika x menjadi 2x, energi menjadi 4 kali." },
+            { q: "Rumus usaha (W) ketika gaya searah perpindahan adalah...", opts: ["A. W = m × g × h", "B. W = ½ × m × v²", "C. W = F × s", "D. W = ½ × k × x²"], ans: 2, exp: "Usaha oleh gaya yang searah perpindahan dihitung dengan W = F × s." },
+            { q: "Sebuah gaya 10 N memindahkan benda sejauh 3 m searah gaya. Besar usaha yang dilakukan adalah...", opts: ["A. 13 J", "B. 30 J", "C. 7 J", "D. 3 J"], ans: 1, exp: "W = F × s = 10 N × 3 m = 30 joule." }
+        ];
+
+        let quizIndex = 0;
+        let quizTimerHandle = null;
+        let quizTimeLeft = 60;
+        let timedQuiz = false;
+
+        function startQuiz(challengeMode = false) {
+            quizIndex = 0; score = 0; timedQuiz = challengeMode;
+            if (quizTimerHandle) clearInterval(quizTimerHandle);
+            quizTimeLeft = 60;
+            closeDashboard();
+            document.getElementById('screen-quiz').classList.remove('hidden');
+            const timerBadge = document.getElementById('quiz-timer-badge');
+            timerBadge.classList.toggle('hidden', !timedQuiz);
+            timerBadge.classList.remove('urgent');
+            if (timedQuiz) {
+                updateQuizTimer();
+                quizTimerHandle = setInterval(() => {
+                    quizTimeLeft--;
+                    updateQuizTimer();
+                    if (quizTimeLeft <= 0) {
+                        clearInterval(quizTimerHandle);
+                        quizTimerHandle = null;
+                        document.getElementById('quiz-question-text').innerText = 'Waktu tantangan habis! Lanjutkan untuk melihat hasil akhir.';
+                        document.getElementById('quiz-options-container').innerHTML = '';
+                        document.getElementById('quiz-explanation-box').classList.remove('hidden');
+                        document.getElementById('quiz-explanation-text').innerText = 'Tetap semangat. Kamu bisa mencoba tantangan lagi!';
+                        document.getElementById('btn-quiz-next').classList.remove('hidden');
+                        document.getElementById('btn-quiz-next').innerText = 'Lihat Hasil ➔';
+                    }
+                }, 1000);
+            }
+            document.getElementById('btn-quiz-next').innerText = 'Soal Berikutnya ➔';
+            renderQuestion();
+        }
+
+        function updateQuizTimer() {
+            const badge = document.getElementById('quiz-timer-badge');
+            if (!badge) return;
+            badge.innerText = `⏱️ ${quizTimeLeft} dtk`;
+            badge.classList.toggle('urgent', quizTimeLeft <= 10);
+        }
+
+        function renderQuestion() {
+            const q = quizData[quizIndex];
+            document.getElementById('quiz-progress-text').innerText = `Kuis — Soal ${quizIndex + 1}/10`;
+            document.getElementById('quiz-score-badge').innerText = `Skor: ${score}`;
+            document.getElementById('quiz-question-text').innerText = q.q;
+            document.getElementById('quiz-explanation-box').classList.add('hidden');
+            document.getElementById('btn-quiz-next').classList.add('hidden');
+            document.getElementById('btn-quiz-next').innerText = 'Soal Berikutnya ➔';
+            const container = document.getElementById('quiz-options-container');
+            container.innerHTML = '';
+            q.opts.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'quiz-opt-btn'; btn.innerText = opt;
+                btn.onclick = () => checkQuizAnswer(idx, btn);
+                container.appendChild(btn);
+            });
+        }
+
+        function checkQuizAnswer(selectedIdx, btnEl) {
+            const q = quizData[quizIndex];
+            const allBtns = document.querySelectorAll('.quiz-opt-btn');
+            allBtns.forEach(b => b.onclick = null);
+            if (selectedIdx === q.ans) { btnEl.classList.add('correct'); score += 20; }
+            else { btnEl.classList.add('incorrect'); allBtns[q.ans].classList.add('correct'); }
+            document.getElementById('quiz-score-badge').innerText = `Skor: ${score}`;
+            document.getElementById('quiz-explanation-text').innerText = q.exp;
+            document.getElementById('quiz-explanation-box').classList.remove('hidden');
+            document.getElementById('btn-quiz-next').classList.remove('hidden');
+        }
+
+        function nextQuizQuestion() {
+            if (timedQuiz && quizTimeLeft <= 0) { showLeaderboard(); return; }
+            quizIndex++;
+            if (quizIndex < quizData.length) renderQuestion();
+            else showLeaderboard();
+        }
+
+        updateProgressUI();
+
+        function showLeaderboard() {
+            if (quizTimerHandle) { clearInterval(quizTimerHandle); quizTimerHandle = null; }
+            document.getElementById('screen-quiz').classList.add('hidden');
+            document.getElementById('screen-leaderboard').classList.remove('hidden');
+            // Simpan leaderboard dengan aman; game tetap selesai jika penyimpanan browser diblokir.
+            let lb = [];
+            try {
+                const saved = localStorage.getItem('energylab_lb');
+                lb = saved ? JSON.parse(saved) : [];
+                if (!Array.isArray(lb)) lb = [];
+            } catch (error) {
+                lb = [];
+            }
+
+            lb.push({ name: player.name, class: player.class, score: score });
+            lb.sort((a, b) => b.score - a.score);
+            lb = lb.slice(0, 5);
+
+            try {
+                localStorage.setItem('energylab_lb', JSON.stringify(lb));
+            } catch (error) {
+                // Leaderboard tetap ditampilkan untuk sesi ini.
+            }
+
+            const tbody = document.getElementById('lb-table-body');
+            tbody.innerHTML = '';
+            lb.forEach((e, i) => {
+                const row = document.createElement('tr');
+                [String(i + 1), String(e.name ?? 'Pemain'), String(e.class ?? '-'), String(e.score ?? 0)]
+                    .forEach((value, col) => {
+                        const cell = document.createElement('td');
+                        cell.textContent = col === 0 ? '#' + value : value;
+                        if (col === 0) cell.style.color = '#f59e0b';
+                        if (col === 0 || col === 3) cell.style.fontWeight = '700';
+                        if (col === 3) cell.style.color = '#10b981';
+                        row.appendChild(cell);
+                    });
+                tbody.appendChild(row);
+            });
+        }
+    </script>
+</body>
+</html>
+ 
